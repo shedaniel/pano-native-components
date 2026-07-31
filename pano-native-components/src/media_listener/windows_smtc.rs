@@ -32,7 +32,7 @@ static OUTGOING_PLAYER_EVENT_TX: OnceLock<mpsc::Sender<JniCallback>> = OnceLock:
 fn send_outgoing_event(outgoing_event: JniCallback) {
     let tx = OUTGOING_PLAYER_EVENT_TX.get();
 
-    log::debug!("Sending outgoing message: {:?}", &outgoing_event);
+    log::debug!("Sending outgoing message: {:?}", outgoing_event);
 
     if let Some(sender) = tx {
         match sender.try_send(outgoing_event) {

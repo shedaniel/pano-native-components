@@ -92,6 +92,7 @@ pub extern "system" fn Java_com_arn_scrobble_DesktopWebView_launchWebView(
             let data_dir: String = data_dir.mutf8_chars(env)?.into();
             let proxy_host: String = proxy_host.mutf8_chars(env)?.into();
             let proxy_type_string = match proxy_type {
+                0 => "",
                 1 => "http",
                 2 => "socks5",
                 _ => {

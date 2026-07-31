@@ -9,8 +9,8 @@ mod tray;
 mod discord_rpc;
 mod ipc;
 mod jni_callback;
+mod myutils;
 mod theme_observer;
-mod windows_utils;
 
 use ftail::Ftail;
 use jni::sys::{jboolean, jint, jlong};
@@ -223,16 +223,36 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_getMachineId<'
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_setHwndWindows(
+pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_applyWindowEffects(
     _env: EnvUnowned,
     _class: JClass,
     handle: jlong,
+    is_dark: jboolean,
+    is_blur: jboolean,
 ) {
     #[cfg(target_os = "windows")]
     {
         let mut hwnd = HWND.lock().unwrap();
         *hwnd = Some(handle);
-        windows_utils::apply_dark_mode_to_window(handle);
+
+        if is_dark {
+            myutils::apply_dark_mode_to_window(handle);
+        }
+
+        if is_blur {
+            myutils::apply_blur_to_window(handle, true);
+        }
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        if is_blur {
+            let window_id: u32 = handle.try_into().unwrap();
+
+            myutils::apply_blur_to_window(window_id).unwrap_or_else(|e| {
+                log::error!("Failed to apply blur to window: {e}");
+            });
+        }
     }
 }
 
@@ -271,7 +291,7 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_isFileLockedWi
         unowned_env
             .with_env(|env| -> jni::errors::Result<jboolean> {
                 let path: String = path.mutf8_chars(env)?.into();
-                Ok(windows_utils::is_file_locked(&path))
+                Ok(myutils::is_file_locked(&path))
             })
             .resolve::<jni::errors::ThrowRuntimeExAndDefault>()
     }
@@ -285,7 +305,7 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_isFileLockedWi
 pub fn send_incoming_event(incoming_event: IncomingEvent) {
     let tx = INCOMING_PLAYER_EVENT_TX.lock().unwrap();
 
-    log::debug!("Sending message: {:?}", &incoming_event);
+    log::debug!("Sending message: {:?}", incoming_event);
 
     if let Some(ref sender) = *tx {
         match sender.try_send(incoming_event) {

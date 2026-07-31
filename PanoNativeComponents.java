@@ -29,7 +29,7 @@ public class PanoNativeComponents {
 
     static native String getMachineId();
 
-    static native void setHwndWindows(long hwnd);
+    static native void applyWindowEffects(long handle, boolean isDark, boolean isBlur);
 
     static native boolean sendIpcCommand(String command, String arg);
 

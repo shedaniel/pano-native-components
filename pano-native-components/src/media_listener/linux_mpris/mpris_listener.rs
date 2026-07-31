@@ -160,7 +160,7 @@ pub async fn listener(
                 }
 
                 IncomingEvent::RefreshSessions => {
-                    for (app_id, _app_name) in dbus_names_to_identities.read().await.iter() {
+                    for app_id in dbus_names_to_identities.read().await.keys() {
                         let is_allowed = is_app_allowed(app_id);
                         let is_tracking = names_to_handles.read().await.contains_key(app_id);
                         if is_allowed && !is_tracking {

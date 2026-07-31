@@ -2,7 +2,12 @@ use std::fs::OpenOptions;
 use std::os::windows::fs::OpenOptionsExt;
 
 use windows::Win32::Foundation::HWND;
-use windows::Win32::Graphics::Dwm::{DWMWA_USE_IMMERSIVE_DARK_MODE, DwmSetWindowAttribute};
+use windows::Win32::Graphics::Dwm::{
+    DWMSBT_MAINWINDOW, DWMSBT_TRANSIENTWINDOW, DWMWA_SYSTEMBACKDROP_TYPE,
+    DWMWA_USE_IMMERSIVE_DARK_MODE, DwmExtendFrameIntoClientArea, DwmSetWindowAttribute,
+};
+use windows::Win32::UI::Controls::MARGINS;
+use windows_version::OsVersion;
 // use windows_registry::CURRENT_USER;
 
 // const REG_NAME: &str = "Pano Scrobbler";
@@ -74,6 +79,55 @@ pub fn apply_dark_mode_to_window(handle: i64) {
         .unwrap_or_else(|e| {
             log::error!("Failed to set DWMWA_USE_IMMERSIVE_DARK_MODE for window {handle}: {e}");
         });
+    }
+}
+
+pub fn apply_blur_to_window(handle: i64, acryllic: bool) {
+    // Windows 11 21H2 is build 10.0.22000
+    if OsVersion::current() < OsVersion::new(10, 0, 0, 22000) {
+        return;
+    }
+
+    let hwnd = HWND(handle as _);
+    let backdrop_type = if acryllic {
+        DWMSBT_TRANSIENTWINDOW
+    } else {
+        DWMSBT_MAINWINDOW
+    };
+    let margins = MARGINS {
+        cxLeftWidth: -1,
+        cxRightWidth: -1,
+        cyTopHeight: -1,
+        cyBottomHeight: -1,
+    };
+    // let corner_pref = DWMWCP_ROUND;
+
+    unsafe {
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_SYSTEMBACKDROP_TYPE,
+            &backdrop_type as *const _ as *const _,
+            std::mem::size_of_val(&backdrop_type) as u32,
+        )
+        .unwrap_or_else(|e| {
+            log::error!("Failed to set DWMWA_SYSTEMBACKDROP_TYPE: {e}");
+        });
+
+        // Extend the frame into the entire client area so the backdrop
+        // is actually visible through it, not just at the (nonexistent) border.
+        DwmExtendFrameIntoClientArea(hwnd, &margins).unwrap_or_else(|e| {
+            log::error!("Failed to extend frame into client area: {e}");
+        });
+
+        // DwmSetWindowAttribute(
+        //     hwnd,
+        //     DWMWA_WINDOW_CORNER_PREFERENCE,
+        //     &corner_pref as *const _ as *const _,
+        //     std::mem::size_of::<i32>() as u32,
+        // )
+        // .unwrap_or_else(|e| {
+        //     log::error!("Failed to set DWMWA_WINDOW_CORNER_PREFERENCE: {e}");
+        // });
     }
 }
 
