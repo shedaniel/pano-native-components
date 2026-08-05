@@ -1,4 +1,7 @@
-use crate::jni_callback::JniCallback;
+use crate::JniCallback;
+use crate::tray::OUTGOING_TRAY_EVENT_TX;
+use crate::tray::PanoTrayData;
+use crate::tray::TOKIO_USER_EVENT_SENDER;
 use image::GenericImageView;
 use ksni::{Icon, MenuItem, TrayMethods, menu::StandardItem};
 use std::{
@@ -7,38 +10,13 @@ use std::{
 };
 use tokio::sync::mpsc;
 
-pub struct PanoTrayData {
-    pub tooltip: String,
-    pub png_bytes: Vec<u8>,
-    pub invert: bool,
-    pub menu_items: Vec<(String, String)>,
-}
-
 struct PanoTray {
     pub data: PanoTrayData,
     pub prev_icon_hash: u64,
     pub prev_icon: Option<Icon>,
 }
 
-static TOKIO_USER_EVENT_SENDER: OnceLock<mpsc::Sender<PanoTrayData>> = OnceLock::new();
-static OUTGOING_TRAY_EVENT_TX: OnceLock<mpsc::Sender<JniCallback>> = OnceLock::new();
-
-pub fn update_tray(pano_tray_data: PanoTrayData) {
-    if let Some(sender) = TOKIO_USER_EVENT_SENDER.get() {
-        sender.try_send(pano_tray_data).unwrap_or_else(|_| {
-            log::error!("Failed to send tray event");
-        });
-    } else {
-        log::error!("Event loop not running");
-    }
-}
-
-fn compute_icon(png_bytes: &[u8], invert: bool) -> (Option<Icon>, u64) {
-    let mut hasher = DefaultHasher::new();
-    png_bytes.hash(&mut hasher);
-    invert.hash(&mut hasher);
-    let icon_hash = hasher.finish();
-
+fn compute_icon(png_bytes: &[u8], invert: bool) -> Option<Icon> {
     let img = image::load_from_memory_with_format(png_bytes, image::ImageFormat::Png);
     if let Ok(mut img) = img {
         if invert {
@@ -49,19 +27,17 @@ fn compute_icon(png_bytes: &[u8], invert: bool) -> (Option<Icon>, u64) {
         for pixel in data.chunks_exact_mut(4) {
             pixel.rotate_right(1); // rgba to argb
         }
-        (
-            Some(Icon {
-                width: width as i32,
-                height: height as i32,
-                data,
-            }),
-            icon_hash,
-        )
+        Some(Icon {
+            width: width as i32,
+            height: height as i32,
+            data,
+        })
     } else {
         log::error!("invalid png");
-        (None, 0)
+        None
     }
 }
+
 impl ksni::Tray for PanoTray {
     fn id(&self) -> String {
         "com.arn.scrobble.tray".into()
@@ -123,6 +99,13 @@ impl ksni::Tray for PanoTray {
     }
 }
 
+fn compute_icon_hash(png_bytes: &[u8], invert: bool) -> u64 {
+    let mut hasher = DefaultHasher::new();
+    png_bytes.hash(&mut hasher);
+    invert.hash(&mut hasher);
+    hasher.finish()
+}
+
 pub async fn tray_listener(
     callback_sender: mpsc::Sender<JniCallback>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -138,11 +121,13 @@ pub async fn tray_listener(
         if !tray_init_attempted {
             tray_init_attempted = true;
 
-            let (prev_icon, prev_icon_hash) = compute_icon(&tray_data.png_bytes, tray_data.invert);
+            let icon_hash = compute_icon_hash(&tray_data.png_bytes, tray_data.invert);
+            let icon = compute_icon(&tray_data.png_bytes, tray_data.invert);
+
             let tray = PanoTray {
                 data: tray_data,
-                prev_icon_hash,
-                prev_icon,
+                prev_icon_hash: icon_hash,
+                prev_icon: icon,
             };
             match tray.disable_dbus_name(ashpd::is_sandboxed()).spawn().await {
                 Ok(handle) => {
@@ -155,7 +140,9 @@ pub async fn tray_listener(
         } else if let Some(handle) = tray_handle.get() {
             handle
                 .update(|existing_tray| {
-                    let (icon, icon_hash) = compute_icon(&tray_data.png_bytes, tray_data.invert);
+                    let icon_hash = compute_icon_hash(&tray_data.png_bytes, tray_data.invert);
+                    let icon = compute_icon(&tray_data.png_bytes, tray_data.invert);
+
                     if icon_hash != existing_tray.prev_icon_hash && icon.is_some() {
                         existing_tray.prev_icon = icon;
                         existing_tray.prev_icon_hash = icon_hash;

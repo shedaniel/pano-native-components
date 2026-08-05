@@ -6,67 +6,13 @@ use windows::Win32::Graphics::Dwm::{
     DWMSBT_MAINWINDOW, DWMSBT_TRANSIENTWINDOW, DWMWA_SYSTEMBACKDROP_TYPE,
     DWMWA_USE_IMMERSIVE_DARK_MODE, DwmExtendFrameIntoClientArea, DwmSetWindowAttribute,
 };
+use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows::Win32::UI::Controls::MARGINS;
+use windows_core::{PCSTR, w};
 use windows_version::OsVersion;
-// use windows_registry::CURRENT_USER;
 
-// const REG_NAME: &str = "Pano Scrobbler";
-
-// pub fn register_aumid_if_needed(aumid: &str, icon_path: &str) -> Result<(), Box<dyn std::error::Error>> {
-//     let key_path = format!("Software\\Classes\\AppUserModelId\\{aumid}");
-
-//     let exists = CURRENT_USER.open(&key_path).is_ok();
-
-//     if !exists {
-//         let key = CURRENT_USER.create(&key_path)?;
-//         key.set_string("DisplayName", REG_NAME)?;
-//         key.set_string("IconUri", icon_path)?;
-//         key.set_string("IconBackgroundColor", "0")?;
-//     }
-//     Ok(())
-// }
-
-// taken from tao
-
-/*
-pub fn allow_dark_mode_for_app(is_dark_mode: bool) {
-    let huxtheme: isize = unsafe { LoadLibraryA(s!("uxtheme.dll")).unwrap_or_default().0 as _ };
-
-    #[repr(C)]
-    enum PreferredAppMode {
-        Default,
-        AllowDark,
-        // ForceDark,
-        // ForceLight,
-        // Max,
-    }
-    const UXTHEME_SETPREFERREDAPPMODE_ORDINAL: u16 = 135;
-    type SetPreferredAppMode = unsafe extern "system" fn(PreferredAppMode) -> PreferredAppMode;
-    let set_preferred_app_mode: Option<SetPreferredAppMode> = unsafe {
-        if HMODULE(huxtheme as _).is_invalid() {
-            return;
-        }
-
-        GetProcAddress(
-            HMODULE(huxtheme as _),
-            PCSTR::from_raw(UXTHEME_SETPREFERREDAPPMODE_ORDINAL as usize as *mut _),
-        )
-        .map(|handle| std::mem::transmute(handle))
-    };
-
-    if let Some(_set_preferred_app_mode) = set_preferred_app_mode {
-        let mode = if is_dark_mode {
-            PreferredAppMode::AllowDark
-        } else {
-            PreferredAppMode::Default
-        };
-        unsafe { _set_preferred_app_mode(mode) };
-    }
-}
-*/
-
-pub fn apply_dark_mode_to_window(handle: i64) {
-    let use_dark: i32 = 1;
+pub fn apply_dark_mode_to_window(handle: i64, is_dark: bool) {
+    let use_dark: i32 = if is_dark { 1 } else { 0 };
     let hwnd = HWND(handle as _);
 
     unsafe {
@@ -144,6 +90,24 @@ pub fn is_file_locked(path: &str) -> bool {
         Err(err) => {
             // log::error!("Error opening file '{path}': {err}");
             err.raw_os_error() == Some(32) // ERROR_SHARING_VIOLATION
+        }
+    }
+}
+
+pub fn enable_dark_mode_for_process() {
+    // Ordinals from uxtheme.dll (undocumented, stable since Win10 1903)
+    const ORD_SET_PREFERRED_APP_MODE: usize = 135;
+    type FnSetPreferredAppMode = unsafe extern "system" fn(i32) -> i32;
+
+    unsafe {
+        if let Ok(uxtheme) = LoadLibraryW(w!("uxtheme.dll"))
+            && let Some(set_preferred_app_mode) =
+                GetProcAddress(uxtheme, PCSTR(ORD_SET_PREFERRED_APP_MODE as _))
+        {
+            let set_preferred_app_mode: FnSetPreferredAppMode =
+                std::mem::transmute(set_preferred_app_mode);
+            // PreferredAppMode::AllowDark = 1
+            set_preferred_app_mode(1);
         }
     }
 }
