@@ -18,7 +18,7 @@ ftail = "0.3"
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-zbus = { version = "5.18", default-features = false, features = ["async-io"] }
+zbus = { version = "5.19", default-features = false, features = ["async-io"] }
 futures-util = "0.3"
 ksni = "0.3"
 ashpd = { version = "0.13", features = [
@@ -47,6 +47,7 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     "Win32_UI_Controls",
     "Win32_UI_WindowsAndMessaging",
+    "Win32_UI_HiDpi",
     "System",
 ] }
 windows-core = "0.62"

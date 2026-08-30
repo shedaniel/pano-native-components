@@ -654,5 +654,6 @@ fn parse_playback_state(playback_status: String, can_go_next: bool, position: i6
         state: playback_status,
         position,
         can_skip: can_go_next,
+        can_change_channel: false,
     }
 }

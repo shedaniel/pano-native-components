@@ -8,6 +8,9 @@ use windows::Win32::Graphics::Dwm::{
 };
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows::Win32::UI::Controls::MARGINS;
+use windows::Win32::UI::HiDpi::{
+    DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, SetProcessDpiAwarenessContext,
+};
 use windows_core::{PCSTR, w};
 use windows_version::OsVersion;
 
@@ -94,7 +97,7 @@ pub fn is_file_locked(path: &str) -> bool {
     }
 }
 
-pub fn enable_dark_mode_for_process() {
+pub fn set_process_flags() {
     // Ordinals from uxtheme.dll (undocumented, stable since Win10 1903)
     const ORD_SET_PREFERRED_APP_MODE: usize = 135;
     type FnSetPreferredAppMode = unsafe extern "system" fn(i32) -> i32;
@@ -108,6 +111,11 @@ pub fn enable_dark_mode_for_process() {
                 std::mem::transmute(set_preferred_app_mode);
             // PreferredAppMode::AllowDark = 1
             set_preferred_app_mode(1);
+        }
+
+        // Tray menu looks blurry otherwise
+        if let Err(e) = SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) {
+            log::error!("Failed to set process DPI awareness: {e}");
         }
     }
 }

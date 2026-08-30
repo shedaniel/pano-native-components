@@ -372,6 +372,7 @@ fn call_java_fn(env: &mut jni::Env, event: &JniCallback) -> Option<bool> {
                 state,
                 position,
                 can_skip,
+                can_change_channel,
             },
         ) => {
             let app_id = JString::from_str(env, app_id).unwrap();
@@ -379,12 +380,13 @@ fn call_java_fn(env: &mut jni::Env, event: &JniCallback) -> Option<bool> {
             env.call_static_method(
                 class,
                 jni_str!("onPlaybackStateChanged"),
-                jni_sig!("(Ljava/lang/String;Ljava/lang/String;JZ)V"),
+                jni_sig!("(Ljava/lang/String;Ljava/lang/String;JZZ)V"),
                 &[
                     (&app_id).into(),
                     (&state).into(),
                     (*position).into(),
                     (*can_skip).into(),
+                    (*can_change_channel).into(),
                 ],
             )
         }
@@ -456,7 +458,7 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_startListening
     _class: JClass,
 ) {
     #[cfg(target_os = "windows")]
-    myutils::enable_dark_mode_for_process();
+    myutils::set_process_flags();
 
     unowned_env
         .with_env(|env| -> jni::errors::Result<()> {

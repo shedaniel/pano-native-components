@@ -17,6 +17,7 @@ pub struct PlaybackInfo {
     pub state: PlaybackState,
     pub position: i64,
     pub can_skip: bool,
+    pub can_change_channel: bool,
 }
 
 #[derive(Debug, Clone)]

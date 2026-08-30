@@ -16,8 +16,9 @@ use windows::Win32::UI::WindowsAndMessaging::{
     DestroyIcon, DestroyMenu, DispatchMessageW, GetCursorPos, HICON, HMENU, KillTimer,
     LR_DEFAULTCOLOR, MF_GRAYED, MF_SEPARATOR, MF_STRING, MSG, PM_REMOVE, PeekMessageW,
     PostMessageW, RegisterClassW, RegisterWindowMessageW, SetForegroundWindow, SetTimer,
-    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_COMMAND,
-    WM_LBUTTONDBLCLK, WM_NULL, WM_RBUTTONUP, WM_TIMER, WNDCLASSW, WS_EX_TOPMOST,
+    TPM_RIGHTBUTTON, TrackPopupMenu, TranslateMessage, WINDOW_STYLE, WM_APP, WM_CLOSE, WM_COMMAND,
+    WM_LBUTTONDBLCLK, WM_NULL, WM_QUERYENDSESSION, WM_RBUTTONUP, WM_TIMER, WNDCLASSW,
+    WS_EX_TOPMOST,
 };
 use windows::core::{PCWSTR, w};
 
@@ -25,7 +26,7 @@ const WM_TRAYICON: u32 = WM_APP + 1;
 const TRAY_UID: u32 = 1;
 const CMD_ID_BASE: u32 = 1000;
 const TIMER_ID_CLICK: usize = 1;
-const DBL_CLICK_THRESHOLD_MS: u32 = 150;
+const DBL_CLICK_THRESHOLD_MS: u32 = 100;
 const ICON_DIMENSION: i32 = 128;
 
 thread_local! {
@@ -107,6 +108,23 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
             }
             LRESULT(0)
         }
+
+        WM_QUERYENDSESSION => {
+            if let Some(tx) = super::OUTGOING_TRAY_EVENT_TX.get() {
+                let _ = tx.try_send(JniCallback::TrayItemClicked("Exit".to_string()));
+            }
+            // tell windows we're fine with shutdown proceeding
+            LRESULT(1)
+        }
+
+        WM_CLOSE => {
+            // for when the compose block hasn't run yet
+            if let Some(tx) = super::OUTGOING_TRAY_EVENT_TX.get() {
+                let _ = tx.try_send(JniCallback::TrayItemClicked("Exit".to_string()));
+            }
+            LRESULT(0)
+        }
+
         _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }

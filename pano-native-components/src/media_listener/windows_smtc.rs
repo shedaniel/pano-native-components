@@ -544,10 +544,23 @@ impl SessionTracker {
                 _ => PlaybackState::Other,
             };
 
-            let playback_controls = playback_info.Controls();
-
-            let can_skip = playback_controls
+            let can_skip = playback_info
+                .Controls()
                 .map(|c| c.IsNextEnabled())
+                .unwrap_or_else(|_| Ok(false))
+                .unwrap_or_default();
+
+            // this becomes true for spotify remote
+            let can_channel_down = playback_info
+                .Controls()
+                .map(|c| c.IsChannelDownEnabled())
+                .unwrap_or_else(|_| Ok(false))
+                .unwrap_or_default();
+
+            // this doesnt, kept it anyway
+            let can_channel_up = playback_info
+                .Controls()
+                .map(|c| c.IsChannelUpEnabled())
                 .unwrap_or_else(|_| Ok(false))
                 .unwrap_or_default();
 
@@ -557,6 +570,7 @@ impl SessionTracker {
             let playback_info = PlaybackInfo {
                 state,
                 can_skip,
+                can_change_channel: can_channel_down || can_channel_up,
                 position,
             };
 
@@ -584,37 +598,6 @@ impl SessionTracker {
                 .unwrap_or_default()
                 .to_string();
             let track_number = media_properties.TrackNumber().unwrap_or_default();
-
-            // let thumbnail = if *ALBUM_ART_ENABLED.lock().unwrap()
-            //     && let Ok(thumbnail) = media_properties.Thumbnail()
-            // {
-            //     let read_async = thumbnail.OpenReadAsync();
-            //     if let Ok(read_async) = read_async {
-            //         if let Ok(stream) = read_async.join() {
-            //             read_stream_to_vec(&stream)
-            //                 .map(Some)
-            //                 .unwrap_or_else(|_| None)
-            //         } else {
-            //             None
-            //         }
-            //     } else {
-            //         None
-            //     }
-            // } else {
-            //     None
-            // };
-
-            // let genres = media_properties
-            //     .Genres()
-            //     .map(|x| x.GetAt(0).unwrap_or_default().to_string())
-            //     .ok();
-            // let playback_type = media_properties
-            //     .PlaybackType()
-            //     .map(|x| x.Value().unwrap_or(windows::Media::MediaPlaybackType(0)))
-            //     .ok();
-
-            // println!("Genres: {:?}", genres);
-            // println!("Playback Type: {:?}", playback_type);
 
             // get the existing duration if available
 
