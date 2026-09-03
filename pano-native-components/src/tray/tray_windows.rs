@@ -145,7 +145,7 @@ fn build_menu() -> windows::core::Result<HMENU> {
                 if id.ends_with("Disabled") {
                     flags |= MF_GRAYED;
                 }
-                let wide = to_wide(text);
+                let wide = to_wide(&text.replace('&', "&&"));
                 unsafe {
                     AppendMenuW(
                         hmenu,
