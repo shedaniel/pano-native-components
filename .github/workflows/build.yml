@@ -1,6 +1,11 @@
 name: Build
 
-on: [workflow_dispatch]
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'native-webview/**'
+      - 'pano-native-components/**'
 
 jobs:
   build:
