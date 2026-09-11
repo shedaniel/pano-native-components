@@ -43,4 +43,3 @@ jobs:
           target/release/libnative_webview.so
           target/release/pano_native_components.dll
           target/release/native_webview.dll
-        archive: false
