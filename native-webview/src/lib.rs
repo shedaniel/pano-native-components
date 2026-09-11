@@ -1,13 +1,13 @@
 #[cfg(target_os = "linux")]
 mod gtk4_loop;
 #[cfg(target_os = "windows")]
-mod tao_loop;
+mod webview2_loop;
 mod webview_event;
 
 #[cfg(target_os = "linux")]
 use gtk4_loop as platform_loop;
 #[cfg(target_os = "windows")]
-use tao_loop as platform_loop;
+use webview2_loop as platform_loop;
 
 use jni::EnvUnowned;
 use jni::jni_sig;

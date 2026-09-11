@@ -28,7 +28,7 @@ use crate::{
         autostart, media_player2::MediaPlayer2Proxy, notifications::NotificationsProxy,
         player::PlayerProxy,
     },
-    theme_observer,
+    myutils,
 };
 use crate::{media_listener::linux_mpris::metadata::Metadata, tray};
 
@@ -362,7 +362,7 @@ pub async fn listener(
         Ok(())
     };
 
-    let theme_observer = theme_observer::observe(outgoing_tx);
+    let theme_observer = myutils::observe_theme_changes(outgoing_tx);
 
     let exit_res = tokio::try_join!(
         incoming_events.map_err(Into::into),

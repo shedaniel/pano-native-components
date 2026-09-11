@@ -1,8 +1,13 @@
+use ashpd::desktop::settings::{ColorScheme, Settings};
+use futures_util::StreamExt;
+use tokio::sync::mpsc;
 use x11rb::{
     connection::Connection,
     protocol::xproto::{AtomEnum, ConnectionExt, PropMode},
     wrapper::ConnectionExt as _,
 };
+
+use crate::jni_callback::JniCallback;
 
 pub fn apply_blur_to_window(window_id: u32) -> Result<(), Box<dyn std::error::Error>> {
     let (conn, _screen_num) = x11rb::connect(None)?;
@@ -36,4 +41,54 @@ pub fn apply_blur_to_window(window_id: u32) -> Result<(), Box<dyn std::error::Er
     }
 
     Err(last_err.unwrap_or_else(|| "failed to apply blur".into()))
+}
+
+pub async fn observe_theme_changes(
+    callback_sender: mpsc::Sender<JniCallback>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    {
+        let settings = match Settings::new().await {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("Failed to connect to Settings XDG portal: {}", e);
+                return Ok(());
+            }
+        };
+
+        let scheme = match settings.color_scheme().await {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("Failed to get color scheme: {}", e);
+                return Ok(());
+            }
+        };
+
+        let is_dark_mode = match scheme {
+            ColorScheme::PreferDark => true,
+            ColorScheme::PreferLight | ColorScheme::NoPreference => false,
+        };
+        let _ = callback_sender
+            .send(JniCallback::DarkModeChanged(is_dark_mode))
+            .await;
+
+        let mut color_scheme_stream = match settings.receive_color_scheme_changed().await {
+            Ok(s) => s,
+            Err(e) => {
+                log::error!("Failed to receive color scheme change stream: {}", e);
+                return Ok(());
+            }
+        };
+
+        while let Some(scheme) = color_scheme_stream.next().await {
+            let is_dark_mode = match scheme {
+                ColorScheme::PreferDark => true,
+                ColorScheme::PreferLight | ColorScheme::NoPreference => false,
+            };
+
+            let _ = callback_sender
+                .send(JniCallback::DarkModeChanged(is_dark_mode))
+                .await;
+        }
+    }
+    Ok(())
 }

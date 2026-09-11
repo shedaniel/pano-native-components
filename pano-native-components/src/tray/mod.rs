@@ -1,28 +1,34 @@
+#[derive(Clone)]
 pub struct PanoTrayData {
     pub tooltip: String,
-    pub png_bytes: Vec<u8>,
-    pub invert: bool,
+    pub icons_dir: String,
+    pub icon_name: String,
     pub menu_items: Vec<(String, String)>,
 }
 
-static TOKIO_USER_EVENT_SENDER: OnceLock<mpsc::Sender<PanoTrayData>> = OnceLock::new();
+pub const TRAY_NAME: &str = "com.arn.scrobble.tray";
+
+// created eagerly so update_tray() never races with tray_listener's startup
+static TRAY_DATA_TX: LazyLock<watch::Sender<Option<PanoTrayData>>> =
+    LazyLock::new(|| watch::channel(None).0);
 static OUTGOING_TRAY_EVENT_TX: OnceLock<mpsc::Sender<JniCallback>> = OnceLock::new();
 
 pub fn update_tray(pano_tray_data: PanoTrayData) {
-    if let Some(sender) = TOKIO_USER_EVENT_SENDER.get() {
-        sender.try_send(pano_tray_data).unwrap_or_else(|_| {
-            log::error!("Failed to send tray event");
-        });
-    } else {
-        log::error!("Event loop not running");
+    // send_replace always stores the value, even before any receiver subscribes
+    TRAY_DATA_TX.send_replace(Some(pano_tray_data));
+}
+
+pub fn send_tray_click(id: impl Into<String>) {
+    if let Some(tx) = OUTGOING_TRAY_EVENT_TX.get() {
+        let _ = tx.try_send(JniCallback::TrayItemClicked(id.into()));
     }
 }
 
 #[cfg(target_os = "linux")]
 mod tray_linux;
-use std::sync::OnceLock;
+use std::sync::{LazyLock, OnceLock};
 
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 #[cfg(target_os = "linux")]
 pub use tray_linux::tray_listener;
 

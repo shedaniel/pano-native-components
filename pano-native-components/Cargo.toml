@@ -15,7 +15,6 @@ interprocess = { version = "2.4", features = ["tokio"] }
 discord-rich-presence = "1.1"
 log = "0.4"
 ftail = "0.3"
-image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 zbus = { version = "5.19", default-features = false, features = ["async-io"] }
@@ -36,10 +35,7 @@ windows = { version = "0.62", features = [
     "ApplicationModel",
     "Win32_Graphics_Dwm",
     "Win32_Graphics_Gdi",
-    "Win32_System_Registry",
-    "Win32_System_Threading",
     "Win32_System_LibraryLoader",
-    "Win32_Security",
     "Data_Xml_Dom",
     "UI_Notifications",
     "Storage_Pickers",
@@ -47,9 +43,6 @@ windows = { version = "0.62", features = [
     "Win32_UI_Shell",
     "Win32_UI_Controls",
     "Win32_UI_WindowsAndMessaging",
-    "Win32_UI_HiDpi",
-    "System",
 ] }
-windows-core = "0.62"
 windows-registry = "0.6"
 windows-version = "0.1"

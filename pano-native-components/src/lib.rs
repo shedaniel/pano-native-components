@@ -9,7 +9,6 @@ mod discord_rpc;
 mod ipc;
 mod jni_callback;
 mod myutils;
-mod theme_observer;
 
 use ftail::Ftail;
 use jni::sys::{jboolean, jint, jlong};
@@ -17,7 +16,7 @@ use jni::sys::{jboolean, jint, jlong};
 use jni::EnvUnowned;
 use jni::jni_sig;
 use jni::jni_str;
-use jni::objects::{JByteArray, JClass, JObjectArray, JString};
+use jni::objects::{JClass, JObjectArray, JString};
 
 use jni_callback::JniCallback;
 use log::LevelFilter;
@@ -73,7 +72,7 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_setLogFilePath
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_stopListeningMedia(
+pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_stopEventLoop(
     _env: EnvUnowned,
     _class: JClass,
 ) {
@@ -165,24 +164,19 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_notify(
 pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_setTray(
     mut unowned_env: EnvUnowned,
     _class: JClass,
+    icons_dir: JString,
+    icon_name: JString,
     tooltip: JString,
-    png_bytes: JByteArray,
-    invert: jboolean,
     menu_item_ids: JObjectArray<JString>,
     menu_item_texts: JObjectArray<JString>,
 ) {
     unowned_env
         .with_env(|env| -> jni::errors::Result<()> {
-            use jni::objects::ReleaseMode;
-
             use crate::tray::{PanoTrayData, update_tray};
 
             let tooltip: String = tooltip.mutf8_chars(env)?.into();
 
-            let png_bytes_rust =
-                unsafe { png_bytes.get_elements(env, ReleaseMode::NoCopyBack) }?.to_vec();
-            // convert vec<i8> to vec<u8>
-            let png_bytes_rust = png_bytes_rust.into_iter().map(|b| b as u8).collect();
+            let icons_dir: String = icons_dir.mutf8_chars(env)?.into();
 
             let len = menu_item_ids.len(env)?;
             let mut menu_items = Vec::<(String, String)>::with_capacity(len);
@@ -194,10 +188,12 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_setTray(
                 menu_items.push((id, text));
             }
 
+            let icon_name: String = icon_name.mutf8_chars(env)?.into();
+
             update_tray(PanoTrayData {
                 tooltip,
-                png_bytes: png_bytes_rust,
-                invert,
+                icons_dir,
+                icon_name,
                 menu_items,
             });
             Ok(())
@@ -288,6 +284,22 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_isFileLockedWi
                 Ok(myutils::is_file_locked(&path))
             })
             .resolve::<jni::errors::ThrowRuntimeExAndDefault>()
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        false
+    }
+}
+
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_attachParentConsoleWindows(
+    _unowned_env: EnvUnowned,
+    _class: JClass,
+) -> jboolean {
+    #[cfg(target_os = "windows")]
+    {
+        myutils::attach_parent_console()
     }
 
     #[cfg(not(target_os = "windows"))]
@@ -453,7 +465,7 @@ fn call_java_fn(env: &mut jni::Env, event: &JniCallback) -> Option<bool> {
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_startListeningMedia(
+pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_startEventLoop(
     mut unowned_env: EnvUnowned,
     _class: JClass,
 ) {
@@ -590,18 +602,21 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_autoStartLinux
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_openUrl(
+pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_openUrlLinux(
     mut unowned_env: EnvUnowned,
     _class: JClass,
     url: JString,
 ) {
-    unowned_env
-        .with_env(|env| -> jni::errors::Result<()> {
-            let url: String = url.mutf8_chars(env)?.into();
+    #[cfg(target_os = "linux")]
+    {
+        unowned_env
+            .with_env(|env| -> jni::errors::Result<()> {
+                let url: String = url.mutf8_chars(env)?.into();
 
-            send_incoming_event(IncomingEvent::OpenUrl(url));
+                send_incoming_event(IncomingEvent::OpenUrl(url));
 
-            Ok(())
-        })
-        .resolve::<jni::errors::ThrowRuntimeExAndDefault>();
+                Ok(())
+            })
+            .resolve::<jni::errors::ThrowRuntimeExAndDefault>();
+    }
 }

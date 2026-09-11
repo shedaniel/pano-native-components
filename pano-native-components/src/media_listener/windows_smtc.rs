@@ -1,8 +1,8 @@
 use crate::file_picker::launch_file_picker;
+use crate::ipc;
 use crate::jni_callback::JniCallback;
 use crate::media_events::{IncomingEvent, MetadataInfo, PlaybackInfo, PlaybackState, SessionInfo};
 use crate::{INCOMING_PLAYER_EVENT_TX, tray};
-use crate::{ipc, theme_observer};
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Instant;
@@ -10,16 +10,14 @@ use tokio::sync::mpsc;
 use windows::ApplicationModel::AppInfo;
 use windows::Data::Xml::Dom::XmlDocument;
 use windows::Foundation::TypedEventHandler;
-use windows::Foundation::Uri;
 use windows::Media::Control::{
     GlobalSystemMediaTransportControlsSession, GlobalSystemMediaTransportControlsSessionManager,
     GlobalSystemMediaTransportControlsSessionPlaybackStatus, MediaPropertiesChangedEventArgs,
     PlaybackInfoChangedEventArgs, SessionsChangedEventArgs, TimelinePropertiesChangedEventArgs,
 };
-use windows::System::Launcher;
 use windows::UI::Notifications::ToastNotification;
 use windows::UI::Notifications::ToastNotificationManager;
-use windows_core::HSTRING;
+use windows::core::HSTRING;
 
 // static ALBUM_ART_ENABLED: LazyLock<Mutex<bool>> = LazyLock::new(|| Mutex::new(false));
 
@@ -56,7 +54,6 @@ pub async fn listener(
     // there is a lot of event spam on Windows, use a larger buffer
     let (outgoing_tx, mut outgoing_rx) = mpsc::channel(100);
     let outgoing_tx_clone = outgoing_tx.clone();
-    let outgoing_tx_clone2 = outgoing_tx.clone();
 
     OUTGOING_PLAYER_EVENT_TX.set(outgoing_tx).unwrap();
 
@@ -136,34 +133,12 @@ pub async fn listener(
                     let file_path = launch_file_picker(hwnd, save, file_name, extensions).await;
 
                     if let Ok(path) = file_path {
-                        send_outgoing_event(JniCallback::FilePicked(request_id, path.to_string()));
+                        send_outgoing_event(JniCallback::FilePicked(
+                            request_id,
+                            path.to_string_lossy(),
+                        ));
                     } else {
                         send_outgoing_event(JniCallback::FilePicked(request_id, "".to_string()));
-                    }
-                }
-
-                IncomingEvent::OpenUrl(url) => {
-                    let url_hstring = HSTRING::from(url.clone());
-                    let uri = Uri::CreateUri(&url_hstring);
-
-                    if let Ok(uri) = uri {
-                        let res = Launcher::LaunchUriAsync(&uri);
-
-                        match res {
-                            Ok(launched_operation) => match launched_operation.await {
-                                Err(e) => {
-                                    log::error!("Error launching URI {e:?}");
-                                }
-                                Ok(launched) => {
-                                    if !launched {
-                                        log::error!("Failed to launch URI: false");
-                                    }
-                                }
-                            },
-                            Err(e) => {
-                                log::error!("Error launching URI {e:?}");
-                            }
-                        }
                     }
                 }
 
@@ -188,14 +163,11 @@ pub async fn listener(
         send_outgoing_event(event);
     });
 
-    let theme_observer_future = theme_observer::observe(outgoing_tx_clone);
-
     tokio::try_join!(
         session_events,
         ipc_commands,
         outgoing_events,
-        theme_observer_future,
-        tray::tray_listener(outgoing_tx_clone2)
+        tray::tray_listener(outgoing_tx_clone)
     )?;
 
     Ok(())

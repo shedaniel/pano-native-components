@@ -1,13 +1,13 @@
 #[cfg(target_os = "linux")]
 use ashpd::desktop::file_chooser::{FileFilter, OpenFileRequest};
 #[cfg(target_os = "windows")]
+use windows::core::{HSTRING, Interface};
+#[cfg(target_os = "windows")]
 use windows::{
     Foundation::Uri,
     Storage::Pickers::{FileOpenPicker, FileSavePicker},
     Win32::{Foundation::HWND, UI::Shell::IInitializeWithWindow},
 };
-#[cfg(target_os = "windows")]
-use windows_core::{HSTRING, Interface};
 
 #[cfg(target_os = "linux")]
 pub async fn launch_file_picker(

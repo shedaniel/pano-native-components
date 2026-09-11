@@ -11,8 +11,8 @@ crate-type = ["cdylib"]
 jni = "0.22"
 
 [target.'cfg(target_os = "windows")'.dependencies]
-wry = { version = "0.56", default-features = false, features = ["os-webview"] }
-tao = "0.37"
+windows-webview = "0.100"
+windows-window = "0.100"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 webkit6 = "0.6"

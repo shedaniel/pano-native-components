@@ -8,4 +8,4 @@ mod linux_utils;
 pub use windows_utils::*;
 
 #[cfg(target_os = "linux")]
-pub use linux_utils::apply_blur_to_window;
+pub use linux_utils::*;
