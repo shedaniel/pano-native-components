@@ -43,3 +43,4 @@ jobs:
           target/release/libnative_webview.so
           target/release/pano_native_components.dll
           target/release/native_webview.dll
+          target/release/WebView2Loader.dll
