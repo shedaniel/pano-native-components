@@ -1,13 +1,15 @@
 use std::fs::OpenOptions;
 use std::os::windows::fs::OpenOptionsExt;
 
-use windows::Win32::Foundation::HWND;
+use windows::Win32::Foundation::{HWND, LPARAM, WPARAM};
 use windows::Win32::Graphics::Dwm::{
-    DWMSBT_MAINWINDOW, DWMSBT_TRANSIENTWINDOW, DWMWA_SYSTEMBACKDROP_TYPE,
-    DWMWA_USE_IMMERSIVE_DARK_MODE, DwmExtendFrameIntoClientArea, DwmSetWindowAttribute,
+    DWMSBT_TRANSIENTWINDOW, DWMWA_SYSTEMBACKDROP_TYPE, DWMWA_USE_IMMERSIVE_DARK_MODE,
+    DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmExtendFrameIntoClientArea,
+    DwmSetWindowAttribute,
 };
 use windows::Win32::System::LibraryLoader::{GetProcAddress, LoadLibraryW};
 use windows::Win32::UI::Controls::MARGINS;
+use windows::Win32::UI::WindowsAndMessaging::{SendMessageW, WM_NCACTIVATE};
 use windows::core::{PCSTR, w};
 use windows_version::OsVersion;
 
@@ -28,32 +30,30 @@ pub fn apply_dark_mode_to_window(handle: i64, is_dark: bool) {
     }
 }
 
-pub fn apply_blur_to_window(handle: i64, acryllic: bool) {
+pub fn apply_blur_to_window(handle: i64) {
     // Windows 11 21H2 is build 10.0.22000
     if OsVersion::current() < OsVersion::new(10, 0, 0, 22000) {
         return;
     }
 
     let hwnd = HWND(handle as _);
-    let backdrop_type = if acryllic {
-        DWMSBT_TRANSIENTWINDOW
-    } else {
-        DWMSBT_MAINWINDOW
-    };
     let margins = MARGINS {
         cxLeftWidth: -1,
         cxRightWidth: -1,
         cyTopHeight: -1,
         cyBottomHeight: -1,
     };
-    // let corner_pref = DWMWCP_ROUND;
+    let corner_pref = DWMWCP_ROUND;
 
     unsafe {
+        // WM_NCACTIVATE before setting the backdrop, to get the stuck focus effect
+        SendMessageW(hwnd, WM_NCACTIVATE, Some(WPARAM(1)), Some(LPARAM(-1)));
+
         DwmSetWindowAttribute(
             hwnd,
             DWMWA_SYSTEMBACKDROP_TYPE,
-            &backdrop_type as *const _ as *const _,
-            std::mem::size_of_val(&backdrop_type) as u32,
+            &DWMSBT_TRANSIENTWINDOW as *const _ as _,
+            std::mem::size_of_val(&DWMSBT_TRANSIENTWINDOW) as u32,
         )
         .unwrap_or_else(|e| {
             log::error!("Failed to set DWMWA_SYSTEMBACKDROP_TYPE: {e}");
@@ -65,15 +65,15 @@ pub fn apply_blur_to_window(handle: i64, acryllic: bool) {
             log::error!("Failed to extend frame into client area: {e}");
         });
 
-        // DwmSetWindowAttribute(
-        //     hwnd,
-        //     DWMWA_WINDOW_CORNER_PREFERENCE,
-        //     &corner_pref as *const _ as *const _,
-        //     std::mem::size_of::<i32>() as u32,
-        // )
-        // .unwrap_or_else(|e| {
-        //     log::error!("Failed to set DWMWA_WINDOW_CORNER_PREFERENCE: {e}");
-        // });
+        DwmSetWindowAttribute(
+            hwnd,
+            DWMWA_WINDOW_CORNER_PREFERENCE,
+            &corner_pref as *const _ as *const _,
+            std::mem::size_of::<i32>() as u32,
+        )
+        .unwrap_or_else(|e| {
+            log::error!("Failed to set DWMWA_WINDOW_CORNER_PREFERENCE: {e}");
+        });
     }
 }
 

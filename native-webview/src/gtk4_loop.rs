@@ -140,10 +140,17 @@ pub fn event_loop(jni_callback: impl Fn(WebViewOutgoingEvent) + 'static) {
                                 },
                             );
 
+                            let dpi = gtk4::Settings::default()
+                                .map(|s| s.gtk_xft_dpi() as f64 / 1024.0)
+                                .filter(|d| *d > 0.0)
+                                .unwrap_or(96.0);
+
+                            let scale = dpi / 96.0;
+
                             let window = gtk4::Window::builder()
                                 .title("WebView")
-                                .default_width(640)
-                                .default_height(480)
+                                .default_width((800.0 * scale) as i32)
+                                .default_height((600.0 * scale) as i32)
                                 .child(&webview)
                                 .build();
 

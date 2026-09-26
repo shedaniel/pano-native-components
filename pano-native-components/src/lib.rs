@@ -230,7 +230,7 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_applyWindowEff
         myutils::apply_dark_mode_to_window(handle, is_dark);
 
         if is_blur {
-            myutils::apply_blur_to_window(handle, true);
+            myutils::apply_blur_to_window(handle);
         }
     }
 
