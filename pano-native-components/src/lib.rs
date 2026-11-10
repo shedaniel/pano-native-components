@@ -564,7 +564,7 @@ pub extern "system" fn Java_com_arn_scrobble_PanoNativeComponents_autoStartLinux
     _class: JClass,
     add: jboolean,
 ) {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", target_os = "macos"))]
     {
         let event = IncomingEvent::AutoStart(add);
         send_incoming_event(event);

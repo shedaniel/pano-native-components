@@ -9,7 +9,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [windows-2025-vs2026, ubuntu-22.04, ubuntu-24.04-arm]
+        os: [windows-2025-vs2026, ubuntu-22.04, ubuntu-24.04-arm, macos-14]
         include:
         - os: windows-2025-vs2026
           resources-dir: windows-x64
@@ -17,6 +17,8 @@ jobs:
           resources-dir: linux-x64
         - os: ubuntu-24.04-arm
           resources-dir: linux-arm64
+        - os: macos-14
+          resources-dir: macos-arm64
 
     steps:
     - uses: actions/checkout@v6
@@ -30,6 +32,7 @@ jobs:
     - run: cargo update && cargo build --release
 
     - name: Upload binary
+      if: runner.os != 'macOS'
       uses: actions/upload-artifact@v6
       with:
         name: libs-${{ matrix.resources-dir }}
@@ -38,3 +41,18 @@ jobs:
           target/release/libnative_webview.so
           target/release/pano_native_components.dll
           target/release/native_webview.dll
+
+    # macOS: stage the dylib and the MediaRemote adapter in one dir so the
+    # artifact unpacks flat into composeApp/resources/macos-arm64/
+    - name: Build MediaRemote adapter and stage macOS libs
+      if: runner.os == 'macOS'
+      run: |
+        ./build-macos-adapter.sh stage/mediaremote-adapter
+        cp target/release/libpano_native_components.dylib stage/
+
+    - name: Upload binary (macOS)
+      if: runner.os == 'macOS'
+      uses: actions/upload-artifact@v6
+      with:
+        name: libs-${{ matrix.resources-dir }}
+        path: stage/

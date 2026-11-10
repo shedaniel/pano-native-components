@@ -1,3 +1,15 @@
+//! Desktop login WebView — **Windows + Linux only.**
+//!
+//! macOS intentionally has no webview build. The app uses the out-of-band
+//! browser login flow there (`PlatformStuff.canUseEmbeddedWebView = false` →
+//! the Last.fm/LibreFM OOB screen), and there are no plans to port `wry`/`tao`
+//! (`WKWebView`) — their event loop must own the main thread, which clashes
+//! with the JVM/AWT main thread. This crate therefore compiles to nothing on
+//! macOS: no `native_webview` dylib is produced or shipped, and nothing loads
+//! one (a stray `System.load` is caught as `UnsatisfiedLinkError`).
+
+#![cfg(any(target_os = "windows", target_os = "linux"))]
+
 #[cfg(target_os = "linux")]
 mod gtk4_loop;
 #[cfg(target_os = "windows")]

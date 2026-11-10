@@ -1,6 +1,8 @@
 /target
+/vendor
 Cargo.lock
 *.class
 *.h
 *.log
 .vscode
+.DS_Store

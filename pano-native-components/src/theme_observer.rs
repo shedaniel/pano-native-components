@@ -160,5 +160,23 @@ pub async fn observe(
         .await?;
     }
 
+    #[cfg(target_os = "macos")]
+    {
+        // Phase 1: emit the current appearance once. Live observation is Phase 2.
+        use std::process::Command;
+        let is_dark = Command::new("defaults")
+            .args(["read", "-g", "AppleInterfaceStyle"])
+            .output()
+            .map(|o| {
+                String::from_utf8_lossy(&o.stdout)
+                    .to_lowercase()
+                    .contains("dark")
+            })
+            .unwrap_or(false);
+        let _ = callback_sender
+            .send(JniCallback::DarkModeChanged(is_dark))
+            .await;
+    }
+
     Ok(())
 }

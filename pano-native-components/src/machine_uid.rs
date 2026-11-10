@@ -1,5 +1,30 @@
 // adapted from the machine-uid crate
 
+#[cfg(target_os = "macos")]
+pub mod machine_id {
+    use std::error::Error;
+    use std::process::Command;
+
+    /// Return machine id (IOPlatformUUID), read from ioreg to avoid an IOKit dep.
+    pub fn get_machine_id() -> Result<String, Box<dyn Error>> {
+        let output = Command::new("/usr/sbin/ioreg")
+            .args(["-rd1", "-c", "IOPlatformExpertDevice"])
+            .output()?;
+        let text = String::from_utf8_lossy(&output.stdout);
+        for line in text.lines() {
+            if line.contains("IOPlatformUUID") {
+                if let Some(eq) = line.find('=') {
+                    let val = line[eq + 1..].trim().trim_matches('"').trim().to_string();
+                    if !val.is_empty() {
+                        return Ok(val);
+                    }
+                }
+            }
+        }
+        Err("IOPlatformUUID not found in ioreg output".into())
+    }
+}
+
 #[cfg(target_os = "linux")]
 pub mod machine_id {
     use std::error::Error;
